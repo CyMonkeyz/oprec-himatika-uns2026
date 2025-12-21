@@ -83,7 +83,7 @@ type FormValues = {
 // =====================
 const DRAFT_KEY = "oprec_himatika_2026_draft_v7";
 const TAGLINE = "Syncronized Growth, Reaching New heights";
-const LOGO_SRC = "/himatikaLogo.Png"; // taruh file ini di /public dengan nama yang SAMA PERSIS (case-sensitive di Vercel)
+const LOGO_SRC = "public/himatikaLogo.Png"; // taruh file ini di /public dengan nama yang SAMA PERSIS (case-sensitive di Vercel)
 
 type StepDef =
   | {
