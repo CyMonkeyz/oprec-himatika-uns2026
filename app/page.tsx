@@ -76,15 +76,15 @@ export default function HomePage() {
         <section id="info" className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <FeatureCard
             title="Eksplorasi Diri"
-            desc="Kenali arah, nilai, dan potensi diri agar bermanfaat untuk prodi dan diri sendiri."
+            desc="Kenali arah, nilai, dan potensi diri agar bermanfaat untuk prodi dan diri sendiri"
           />
           <FeatureCard
             title="Mengontrol Emosi"
-            desc="Menjaga kejernihan pikiran agar respons tetap efektif dalam situasi yang menantang."
+            desc="Menjaga kejernihan pikiran agar respons tetap efektif dalam situasi yang menantang"
           />
           <FeatureCard
             title="Menjadi Lebih Berani"
-            desc="Mendorong untuk bertindak, membuka peluang, dan bertumbuh lebih cepat."
+            desc="Mendorong untuk bertindak, membuka peluang, dan bertumbuh lebih cepat"
           />
         </section>
 
