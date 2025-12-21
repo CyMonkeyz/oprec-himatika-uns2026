@@ -18,14 +18,14 @@ export type Unit = {
 };
 
 export const UNITS: Unit[] = [
-  { id: "BIDANG_I", name: "Bidang I", shortDesc: "Fokus pada … (isi nanti)" },
-  { id: "BIDANG_II", name: "Bidang II", shortDesc: "Fokus pada … (isi nanti)" },
-  { id: "BIDANG_III", name: "Bidang III", shortDesc: "Fokus pada … (isi nanti)" },
-  { id: "BIDANG_IV", name: "Bidang IV", shortDesc: "Fokus pada … (isi nanti)" },
-  { id: "BIDANG_V", name: "Bidang V", shortDesc: "Fokus pada … (isi nanti)" },
-  { id: "BIDANG_VI", name: "Bidang VI", shortDesc: "Fokus pada … (isi nanti)" },
-  { id: "BIRO_ADKES", name: "Biro Adkes", shortDesc: "Administrasi & kesekretariatan." },
-  { id: "BIRO_KL", name: "Biro KL", shortDesc: "Komunikasi & layanan internal/eksternal." },
-  { id: "BIRO_ADKEU", name: "Biro Adkeu", shortDesc: "Administrasi keuangan & rapi-rapi data." },
-  { id: "BIRO_EKRAF", name: "Biro Ekraf", shortDesc: "Kreatif: desain, konten, branding." },
+  { id: "BIDANG_I", name: "Bidang I", shortDesc: "Pengembangan Aplikasi Ilmu Pengetahuan dan Teknologi Kematematikaan" },
+  { id: "BIDANG_II", name: "Bidang II", shortDesc: "Kaderisasi dan Pengembangan Anggota" },
+  { id: "BIDANG_III", name: "Bidang III", shortDesc: "Apresiasi Mahasiswa" },
+  { id: "BIDANG_IV", name: "Bidang IV", shortDesc: "Hubungan Eksternal" },
+  { id: "BIDANG_V", name: "Bidang V", shortDesc: "Media Informasi dan Komunikasi" },
+  { id: "BIDANG_VI", name: "Bidang VI", shortDesc: "Minat dan Bakat" },
+  { id: "BIRO_ADKES", name: "Biro Adkes", shortDesc: "Administrasi Kesekretariatan " },
+  { id: "BIRO_KL", name: "Biro KL", shortDesc: "Konsolidasi Lembaga" },
+  { id: "BIRO_ADKEU", name: "Biro Adkeu", shortDesc: "Administrasi Keuangan" },
+  { id: "BIRO_EKRAF", name: "Biro Ekraf", shortDesc: "Ekonomi Kreatif" },
 ];
