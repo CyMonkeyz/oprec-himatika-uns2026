@@ -36,14 +36,13 @@ export default function HomePage() {
           </div>
 
           <h1 className="mt-5 text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
-            Pendaftaran Oprec HIMATIKA 2026
+            PENDAFTARAN PENGURUS HIMATIKA 2026
           </h1>
 
           <p className="mt-3 text-sm leading-relaxed text-zinc-300 sm:text-base">
-            Form dibuat <span className="text-zinc-100 font-medium">ringan</span>,{" "}
-            <span className="text-zinc-100 font-medium">mobile-first</span>, dan lebih banyak{" "}
-            <span className="text-zinc-100 font-medium">pilihan ganda</span> supaya kamu nggak capek ngetik.
-            Draft tersimpan otomatis.
+            Berkontribusi dari <span className="text-zinc-100 font-medium">dalam</span>,{" "}
+            menuju HIMATIKA mencapai <span className="text-zinc-100 font-medium">puncak yang baru</span> {" "}
+            <span className="text-zinc-100 font-medium">Menempa diri</span> bersama menjadi lebih baik.. RAWR!!
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -76,16 +75,16 @@ export default function HomePage() {
         {/* INFO */}
         <section id="info" className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <FeatureCard
-            title="Lebih sedikit mengetik"
-            desc="Mayoritas pertanyaan pilihan ganda. Esai hanya yang penting."
+            title="Eksplorasi Diri"
+            desc="Kenali arah, nilai, dan potensi diri agar bermanfaat untuk prodi dan diri sendiri."
           />
           <FeatureCard
-            title="Draft otomatis"
-            desc="Kalau sinyal jelek, jawaban tetap aman tersimpan."
+            title="Mengontrol Emosi"
+            desc="Menjaga kejernihan pikiran agar respons tetap efektif dalam situasi yang menantang."
           />
           <FeatureCard
-            title="Nyaman di HP"
-            desc="Tombol besar, layout rapi, loading minimal."
+            title="Menjadi Lebih Berani"
+            desc="Mendorong untuk bertindak, membuka peluang, dan bertumbuh lebih cepat."
           />
         </section>
 
