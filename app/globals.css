@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(900px circle at 20% 10%, rgba(255,255,255,0.06), transparent 60%),
+    radial-gradient(900px circle at 80% 20%, rgba(255,255,255,0.05), transparent 55%),
+    radial-gradient(900px circle at 50% 90%, rgba(255,255,255,0.04), transparent 60%),
+    #050505;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Selected state for ChoiceCard (modern browsers) */
+.choice-card:has(.choice-input:checked) {
+  border-color: rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.06);
+}
+
+.choice-card:has(.choice-input:checked) .choice-input {
+  transform: scale(1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
