@@ -74,6 +74,16 @@ const DRAFT_KEY = "oprec_himatika_2026_draft_v7";
 const TAGLINE = "Syncronized Growth, Reaching New heights";
 const LOGO_SRC = "/HimatikaLogo.png";
 const CASES_PER_PACK = 5;
+const HCAPTCHA_SITEKEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY || "";
+
+declare global {
+  interface Window {
+    hcaptcha?: {
+      render: (container: HTMLElement, options: Record<string, unknown>) => number;
+      reset: (id?: number) => void;
+    };
+  }
+}
 
 type StepDef =
   | {
@@ -336,10 +346,14 @@ export default function DaftarPage() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [bannerMsg, setBannerMsg] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaError, setCaptchaError] = useState("");
 
   const submitLock = useRef(false);
   const saveTimer = useRef<number | null>(null);
   const saveStatusTimer = useRef<number | null>(null);
+  const captchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const captchaWidgetId = useRef<number | null>(null);
 
   const draftStartedAt = useRef<number>(Date.now());
   const idempotencyKey = useRef<string>(genKey());
@@ -417,6 +431,57 @@ export default function DaftarPage() {
       sub.unsubscribe();
     };
   }, [watch]);
+
+  useEffect(() => {
+    if (!HCAPTCHA_SITEKEY) return;
+    let cancelled = false;
+
+    const ensureScript = () =>
+      new Promise<void>((resolve, reject) => {
+        if (document.getElementById("hcaptcha-script")) {
+          resolve();
+          return;
+        }
+        const script = document.createElement("script");
+        script.id = "hcaptcha-script";
+        script.src = "https://js.hcaptcha.com/1/api.js?render=explicit";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("HCaptcha failed"));
+        document.body.appendChild(script);
+      });
+
+    ensureScript()
+      .then(() => {
+        if (cancelled || !captchaContainerRef.current || captchaWidgetId.current !== null) return;
+        if (!window.hcaptcha) {
+          setCaptchaError("Captcha gagal dimuat. Coba refresh ya.");
+          return;
+        }
+        captchaWidgetId.current = window.hcaptcha.render(captchaContainerRef.current, {
+          sitekey: HCAPTCHA_SITEKEY,
+          callback: (token: string) => {
+            setCaptchaToken(token);
+            setCaptchaError("");
+          },
+          "expired-callback": () => {
+            setCaptchaToken("");
+          },
+          "error-callback": () => {
+            setCaptchaToken("");
+            setCaptchaError("Captcha gagal dimuat. Coba refresh ya.");
+          },
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setCaptchaError("Captcha gagal dimuat. Coba refresh ya.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const pick3Live = watch("dept.pick_3");
   const commitScenario = watch("commitment.scenario");
@@ -717,6 +782,11 @@ export default function DaftarPage() {
         return;
       }
 
+      if (HCAPTCHA_SITEKEY && !captchaToken) {
+        setBannerMsg("Captcha dibutuhkan.");
+        return;
+      }
+
       // ensure cases loaded for validation
       let bank = casesBank;
       if (!bank) {
@@ -748,7 +818,7 @@ export default function DaftarPage() {
         // anti-spam meta (dev-friendly for now)
         draftStartedAt: draftStartedAt.current,
         idempotencyKey: idempotencyKey.current,
-        captchaToken: "", // DEV dulu
+        captchaToken,
       };
 
       const res = await fetch("/api/submit", {
@@ -1454,6 +1524,25 @@ export default function DaftarPage() {
                     </div>
                   </label>
                 </div>
+
+                {HCAPTCHA_SITEKEY ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="text-sm font-medium text-white/90">Verifikasi captcha</div>
+                    <div className="mt-3">
+                      <div ref={captchaContainerRef} />
+                    </div>
+                    {captchaError ? (
+                      <div className="mt-2 text-xs text-rose-300">{captchaError}</div>
+                    ) : null}
+                    {!captchaToken ? (
+                      <div className="mt-2 text-[11px] text-white/50">Centang captcha dulu sebelum kirim.</div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white/50">
+                    Captcha belum dikonfigurasi. Tambahkan <span className="text-white/70">NEXT_PUBLIC_HCAPTCHA_SITEKEY</span> di env.
+                  </div>
+                )}
               </div>
             )}
           </GlassCard>

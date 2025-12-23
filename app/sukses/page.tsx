@@ -40,6 +40,14 @@ export default function SuccessPage() {
               Kembali ke Beranda
             </Link>
 
+            <a
+              href="https://chat.whatsapp.com/ForJ8mjzTIn9eLWfzTuFGg"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-5 py-3 text-sm font-medium text-emerald-100 hover:bg-emerald-500/20 transition"
+            >
+              Gabung Grup WhatsApp
+            </a>
           </div>
 
           <p className="mt-4 text-xs text-zinc-500">
