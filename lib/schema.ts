@@ -56,7 +56,6 @@ export const SubmitSchema = z.object({
   // meta anti-spam
   draftStartedAt: z.number().optional(),
   idempotencyKey: z.string().trim().min(8).max(80).optional(),
-  captchaToken: z.string().trim().optional().or(z.literal("")),
 });
 
 export type SubmitPayload = z.infer<typeof SubmitSchema>;
