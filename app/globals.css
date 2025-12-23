@@ -20,6 +20,17 @@ body {
   background: rgba(255, 255, 255, 0.12);
 }
 
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Selected state for ChoiceCard (modern browsers) */
 .choice-card:has(.choice-input:checked) {
   border-color: rgba(255,255,255,0.55);
