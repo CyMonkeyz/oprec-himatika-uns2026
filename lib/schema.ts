@@ -20,12 +20,6 @@ export const SubmitSchema = z.object({
     contact: t(120),
   }),
 
-  plan: z.object({
-    next_year: t(80),
-    next_year_detail: OptionalShort,
-    hours_weekly: z.string().trim().max(60).optional().or(z.literal("")),
-  }),
-
   transport: z.object({
     mode: t(80),
     offline_flex: z.string().trim().regex(/^[1-5]$/, "Pilih 1–5"),
@@ -42,10 +36,6 @@ export const SubmitSchema = z.object({
     consistency_detail: OptionalShort,
   }),
 
-  role: z.object({
-    deadline_style: t(120),
-  }),
-
   dept: z.object({
     pick_3: z.array(z.string().trim().min(1)).length(3, "Harus pilih tepat 3"),
   }),
@@ -55,7 +45,6 @@ export const SubmitSchema = z.object({
     .default({}),
 
   essays: z.object({
-    join_reason: z.string().trim().min(50, "Minimal 50 karakter").max(800, "Maks 800 karakter"),
     constraints_mitigation: z.string().trim().min(50, "Minimal 50 karakter").max(800, "Maks 800 karakter"),
     growth_hope: t(120),
     growth_detail: OptionalShort,
