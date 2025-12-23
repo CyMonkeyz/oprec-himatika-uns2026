@@ -233,15 +233,17 @@ function Field({
   label,
   helper,
   error,
+  name,
   children,
 }: {
   label: string;
   helper?: string;
   error?: string;
+  name?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5" data-field={name}>
       <div className="flex items-end justify-between gap-3">
         <div className="text-sm font-medium text-white/90">{label}</div>
         {helper ? <div className="text-xs text-white/50">{helper}</div> : null}
@@ -253,12 +255,14 @@ function Field({
 }
 
 function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const invalid = props["aria-invalid"];
   return (
     <input
       {...props}
       className={cx(
         "w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none",
         "placeholder:text-white/35 focus:border-white/25 focus:ring-2 focus:ring-white/10",
+        invalid && "border-rose-400/70 focus:border-rose-300 focus:ring-rose-400/20",
         props.className
       )}
     />
@@ -266,12 +270,14 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 
 function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const invalid = props["aria-invalid"];
   return (
     <textarea
       {...props}
       className={cx(
         "w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none",
         "placeholder:text-white/35 focus:border-white/25 focus:ring-2 focus:ring-white/10",
+        invalid && "border-rose-400/70 focus:border-rose-300 focus:ring-rose-400/20",
         props.className
       )}
     />
@@ -281,11 +287,13 @@ function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
 function ChoiceCard({
   active,
   disabled,
+  hasError,
   onClick,
   children,
 }: {
   active?: boolean;
   disabled?: boolean;
+  hasError?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
 }) {
@@ -299,6 +307,7 @@ function ChoiceCard({
         active
           ? "border-white/25 bg-white/10"
           : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]",
+        hasError && "border-rose-400/70 bg-rose-500/10",
         disabled && "opacity-50 cursor-not-allowed hover:bg-white/[0.03]"
       )}
     >
@@ -341,6 +350,7 @@ export default function DaftarPage() {
   const [current, setCurrent] = useState(0);
   const [casesBank, setCasesBank] = useState<CasesBank | null>(null);
   const [caseOrder, setCaseOrder] = useState<UnitId[] | null>(null);
+  const [caseErrors, setCaseErrors] = useState<Record<string, boolean>>({});
 
   const [draftFound, setDraftFound] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -354,6 +364,7 @@ export default function DaftarPage() {
   const saveStatusTimer = useRef<number | null>(null);
   const captchaContainerRef = useRef<HTMLDivElement | null>(null);
   const captchaWidgetId = useRef<number | null>(null);
+  const pendingScrollField = useRef<string | null>(null);
 
   const draftStartedAt = useRef<number>(Date.now());
   const idempotencyKey = useRef<string>(genKey());
@@ -598,6 +609,30 @@ export default function DaftarPage() {
 
   const progressPct = Math.round(((current + 1) / steps.length) * 100);
 
+  function requestScrollToField(field: string) {
+    pendingScrollField.current = field;
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-field="${field}"]`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      pendingScrollField.current = null;
+    });
+  }
+
+  function getErrorAtPath(err: any, path: string) {
+    return path.split(".").reduce((acc, key) => acc?.[key], err);
+  }
+
+  function scrollToFirstInvalid(fields: Array<Path<FormValues> | string>) {
+    for (const field of fields) {
+      if (getErrorAtPath(errors, String(field))) {
+        requestScrollToField(String(field));
+        return;
+      }
+    }
+  }
+
   function loadDraft() {
     const d = safeLoadDraft();
     if (!d) {
@@ -619,6 +654,7 @@ export default function DaftarPage() {
     if (chosen.length !== 3) {
       setError("dept.pick_3" as any, { type: "manual", message: "Pilih tepat 3 ya." });
       setBannerMsg("Pilih tepat 3 biro/bidang dulu ya 🙂");
+      requestScrollToField("dept.pick_3");
       return false;
     }
     clearErrors("dept.pick_3" as any);
@@ -657,6 +693,20 @@ export default function DaftarPage() {
     }
     if (count < CASES_PER_PACK) {
       setBannerMsg(`Slide ini wajib terjawab ${CASES_PER_PACK}/${CASES_PER_PACK} dulu ya 🙂`);
+      setCaseErrors((prev) => {
+        const next = { ...prev };
+        for (const id of ids) {
+          const v = (getValues(`caseAnswers.${unitId}.${id}` as any) || "") as CaseKey;
+          const key = `${unitId}:${id}`;
+          next[key] = v !== "A" && v !== "B" && v !== "C" && v !== "D";
+        }
+        return next;
+      });
+      const firstMissing = ids.find((id) => {
+        const v = (getValues(`caseAnswers.${unitId}.${id}` as any) || "") as CaseKey;
+        return v !== "A" && v !== "B" && v !== "C" && v !== "D";
+      });
+      if (firstMissing) requestScrollToField(`caseAnswers.${unitId}.${firstMissing}`);
       return false;
     }
     return true;
@@ -685,7 +735,10 @@ export default function DaftarPage() {
     // base step: trigger validations
     if (currentStep.kind === "base" && currentStep.fields.length) {
       const ok = await trigger(currentStep.fields as any, { shouldFocus: true });
-      if (!ok) return;
+      if (!ok) {
+        scrollToFirstInvalid(currentStep.fields);
+        return;
+      }
     }
 
     setCurrent((c) => Math.min(c + 1, steps.length - 1));
@@ -703,16 +756,23 @@ export default function DaftarPage() {
     options,
     requiredMsg,
     includeLainnyaIfMissing = false,
+    hasError,
   }: {
     name: Path<FormValues> | string;
     options: readonly OptionItem[];
     requiredMsg: string;
     includeLainnyaIfMissing?: boolean;
+    hasError?: boolean;
   }) {
     const v = watch(name as any) as string;
 
     return (
-      <div className="mt-2 grid grid-cols-1 gap-2">
+      <div
+        className={cx(
+          "mt-2 grid grid-cols-1 gap-2",
+          hasError && "rounded-2xl border border-rose-400/70 bg-rose-500/10 p-2"
+        )}
+      >
         {options.map((opt) => {
           const active = v === opt.value;
           return (
@@ -774,6 +834,7 @@ export default function DaftarPage() {
       const okConsent = await trigger(["consent_data"] as any, { shouldFocus: true });
       if (!okConsent) {
         setCurrent(steps.findIndex((s) => s.kind === "base" && s.key === "review"));
+        requestScrollToField("consent_data");
         return;
       }
 
@@ -805,6 +866,20 @@ export default function DaftarPage() {
           const packIdx = selected.findIndex((u) => u === unitId);
           const idx = steps.findIndex((s) => s.kind === "case" && (s as any).packIndex === packIdx + 1);
           if (idx >= 0) setCurrent(idx);
+          setCaseErrors((prev) => {
+            const next = { ...prev };
+            for (const id of ids) {
+              const v = (getValues(`caseAnswers.${unitId}.${id}` as any) || "") as CaseKey;
+              const key = `${unitId}:${id}`;
+              next[key] = v !== "A" && v !== "B" && v !== "C" && v !== "D";
+            }
+            return next;
+          });
+          const firstMissing = ids.find((id) => {
+            const v = (getValues(`caseAnswers.${unitId}.${id}` as any) || "") as CaseKey;
+            return v !== "A" && v !== "B" && v !== "C" && v !== "D";
+          });
+          if (firstMissing) requestScrollToField(`caseAnswers.${unitId}.${firstMissing}`);
           return;
         }
       }
@@ -871,6 +946,14 @@ export default function DaftarPage() {
     if (currentStep.key === "essay") return <TinyBreak title="Almost there" desc="Tulis singkat dan spesifik. 4–6 kalimat cukup." />;
     return null;
   }, [currentStep, current]);
+
+  useEffect(() => {
+    if (!pendingScrollField.current) return;
+    const el = document.querySelector(`[data-field="${pendingScrollField.current}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    pendingScrollField.current = null;
+  }, [currentStep, caseErrors, errors]);
 
   // =====================
   // Render
@@ -980,9 +1063,10 @@ export default function DaftarPage() {
             {/* ========== STEP: BIODATA ========== */}
             {currentStep?.kind === "base" && currentStep.key === "bio" && (
               <div className="space-y-4">
-                <Field label="Nama lengkap" error={(errors as any)?.bio?.full_name?.message}>
+                <Field label="Nama lengkap" error={(errors as any)?.bio?.full_name?.message} name="bio.full_name">
                   <TextInput
                     placeholder="Nama sesuai identitas"
+                    aria-invalid={Boolean((errors as any)?.bio?.full_name)}
                     {...register("bio.full_name", {
                       required: "Wajib diisi ya",
                       minLength: { value: 2, message: "Minimal 2 karakter" },
@@ -991,17 +1075,22 @@ export default function DaftarPage() {
                   />
                 </Field>
 
-                <Field label="Nama panggilan" helper="Opsional">
+                <Field label="Nama panggilan" helper="Opsional" name="bio.preferred_name">
                   <TextInput placeholder="Boleh kosong" {...register("bio.preferred_name")} />
                 </Field>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="NIM" error={(errors as any)?.bio?.nim?.message}>
-                    <TextInput placeholder="M0xxxxxx" {...register("bio.nim", { required: "Wajib diisi ya" })} />
+                  <Field label="NIM" error={(errors as any)?.bio?.nim?.message} name="bio.nim">
+                    <TextInput
+                      placeholder="M0xxxxxx"
+                      aria-invalid={Boolean((errors as any)?.bio?.nim)}
+                      {...register("bio.nim", { required: "Wajib diisi ya" })}
+                    />
                   </Field>
-                  <Field label="Angkatan" error={(errors as any)?.bio?.angkatan?.message}>
+                  <Field label="Angkatan" error={(errors as any)?.bio?.angkatan?.message} name="bio.angkatan">
                     <TextInput
                       placeholder="2024"
+                      aria-invalid={Boolean((errors as any)?.bio?.angkatan)}
                       {...register("bio.angkatan", {
                         required: "Wajib diisi ya",
                         minLength: { value: 4, message: "Contoh: 2024" },
@@ -1012,22 +1101,42 @@ export default function DaftarPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Asal" error={(errors as any)?.bio?.hometown?.message}>
-                    <TextInput placeholder="Kota/kabupaten asal" {...register("bio.hometown", { required: "Wajib diisi ya" })} />
+                  <Field label="Asal" error={(errors as any)?.bio?.hometown?.message} name="bio.hometown">
+                    <TextInput
+                      placeholder="Kota/kabupaten asal"
+                      aria-invalid={Boolean((errors as any)?.bio?.hometown)}
+                      {...register("bio.hometown", { required: "Wajib diisi ya" })}
+                    />
                   </Field>
-                  <Field label="Domisili sekarang" error={(errors as any)?.bio?.current_residence?.message}>
+                  <Field label="Domisili sekarang" error={(errors as any)?.bio?.current_residence?.message} name="bio.current_residence">
                     <TextInput
                       placeholder="Kota tempat tinggal sekarang"
+                      aria-invalid={Boolean((errors as any)?.bio?.current_residence)}
                       {...register("bio.current_residence", { required: "Wajib diisi ya" })}
                     />
                   </Field>
                 </div>
 
-                <Field label="Kontak aktif (Whatsapp)" error={(errors as any)?.bio?.contact?.message} helper="Untuk komunikasi panitia">
-                  <TextInput placeholder="08xxxx" {...register("bio.contact", { required: "Wajib diisi ya" })} />
+                <Field
+                  label="Kontak aktif (Whatsapp)"
+                  error={(errors as any)?.bio?.contact?.message}
+                  helper="Untuk komunikasi panitia"
+                  name="bio.contact"
+                >
+                  <TextInput
+                    placeholder="08xxxx"
+                    aria-invalid={Boolean((errors as any)?.bio?.contact)}
+                    {...register("bio.contact", { required: "Wajib diisi ya" })}
+                  />
                 </Field>
 
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div
+                  className={cx(
+                    "rounded-2xl border border-white/10 bg-white/[0.03] p-4",
+                    (errors as any)?.dept?.pick_3 && "border-rose-400/70 bg-rose-500/10"
+                  )}
+                  data-field="dept.pick_3"
+                >
                   <div className="flex items-center gap-3">
                     <div className="relative h-9 w-9 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
                       <Image src={LOGO_SRC} alt="HIMATIKA" fill className="object-contain p-2" />
@@ -1043,15 +1152,21 @@ export default function DaftarPage() {
             {/* ========== STEP: TRANSPORT ========== */}
             {currentStep?.kind === "base" && currentStep.key === "transport" && (
               <div className="space-y-4">
-                <Field label="Transportasi utama" error={(errors as any)?.transport?.mode?.message}>
+                <Field label="Transportasi utama" error={(errors as any)?.transport?.mode?.message} name="transport.mode">
                   <RadioGroup
                     name="transport.mode"
                     options={transportOptions}
                     requiredMsg="Pilih salah satu ya."
+                    hasError={Boolean((errors as any)?.transport?.mode)}
                   />
                 </Field>
 
-                <Field label="Seberapa fleksibel hadir offline?" helper="1 = sulit, 5 = sangat fleksibel" error={(errors as any)?.transport?.offline_flex?.message}>
+                <Field
+                  label="Seberapa fleksibel hadir offline?"
+                  helper="1 = sulit, 5 = sangat fleksibel"
+                  error={(errors as any)?.transport?.offline_flex?.message}
+                  name="transport.offline_flex"
+                >
                   <div className="mt-2 grid grid-cols-5 gap-2">
                     {offlineFlexOptions.map((v) => {
                       const active = watch("transport.offline_flex") === v;
@@ -1059,6 +1174,7 @@ export default function DaftarPage() {
                         <ChoiceCard
                           key={v}
                           active={active}
+                          hasError={Boolean((errors as any)?.transport?.offline_flex)}
                           onClick={() => setValue("transport.offline_flex", v, { shouldValidate: true })}
                         >
                           <div className="flex items-center justify-center">
@@ -1080,47 +1196,62 @@ export default function DaftarPage() {
             {/* ========== STEP: WORK ========== */}
             {currentStep?.kind === "base" && currentStep.key === "work" && (
               <div className="space-y-6">
-                <Field label="Kalau ada bentrok jadwal mendadak, kamu biasanya…" error={(errors as any)?.commitment?.scenario?.message}>
+                <Field
+                  label="Kalau ada bentrok jadwal mendadak, kamu biasanya…"
+                  error={(errors as any)?.commitment?.scenario?.message}
+                  name="commitment.scenario"
+                >
                   <RadioGroup
                     name="commitment.scenario"
                     options={scenarioOptions}
                     requiredMsg="Pilih salah satu ya."
                     includeLainnyaIfMissing
+                    hasError={Boolean((errors as any)?.commitment?.scenario)}
                   />
                 </Field>
 
                 {commitScenario === "LAINNYA" && (
-                  <Field label="Detail singkat" helper="Opsional">
+                  <Field label="Detail singkat" helper="Opsional" name="commitment.scenario_detail">
                     <TextInput placeholder="Tulis 1 kalimat" {...register("commitment.scenario_detail")} />
                   </Field>
                 )}
 
-                <Field label="Kalau progres mulai melambat, pola komunikasimu…" error={(errors as any)?.commitment?.comms?.message}>
+                <Field
+                  label="Kalau progres mulai melambat, pola komunikasimu…"
+                  error={(errors as any)?.commitment?.comms?.message}
+                  name="commitment.comms"
+                >
                   <RadioGroup
                     name="commitment.comms"
                     options={commsOptions}
                     requiredMsg="Pilih salah satu ya."
                     includeLainnyaIfMissing
+                    hasError={Boolean((errors as any)?.commitment?.comms)}
                   />
                 </Field>
 
                 {commitComms === "LAINNYA" && (
-                  <Field label="Detail singkat" helper="Opsional">
+                  <Field label="Detail singkat" helper="Opsional" name="commitment.comms_detail">
                     <TextInput placeholder="Tulis 1 kalimat" {...register("commitment.comms_detail")} />
                   </Field>
                 )}
 
-                <Field label="Kalau ingin konsisten, kamu paling terbantu oleh…" error={(errors as any)?.commitment?.consistency?.message}>
+                <Field
+                  label="Kalau ingin konsisten, kamu paling terbantu oleh…"
+                  error={(errors as any)?.commitment?.consistency?.message}
+                  name="commitment.consistency"
+                >
                   <RadioGroup
                     name="commitment.consistency"
                     options={consistencyOptions}
                     requiredMsg="Pilih salah satu ya."
                     includeLainnyaIfMissing
+                    hasError={Boolean((errors as any)?.commitment?.consistency)}
                   />
                 </Field>
 
                 {commitConsistency === "LAINNYA" && (
-                  <Field label="Detail singkat" helper="Opsional">
+                  <Field label="Detail singkat" helper="Opsional" name="commitment.consistency_detail">
                     <TextInput placeholder="Tulis 1 kalimat" {...register("commitment.consistency_detail")} />
                   </Field>
                 )}
@@ -1303,9 +1434,18 @@ export default function DaftarPage() {
 
                         {list.map((q, idx) => {
                           const selected = watch(`caseAnswers.${unitId}.${q.id}` as any) as CaseKey;
+                          const caseKey = `${unitId}:${q.id}`;
+                          const hasCaseError = Boolean(caseErrors[caseKey]);
 
                           return (
-                            <div key={q.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                            <div
+                              key={q.id}
+                              className={cx(
+                                "rounded-3xl border border-white/10 bg-white/[0.03] p-4",
+                                hasCaseError && "border-rose-400/70 bg-rose-500/10"
+                              )}
+                              data-field={`caseAnswers.${unitId}.${q.id}`}
+                            >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                 <div className="text-xs text-white/55">
@@ -1330,9 +1470,15 @@ export default function DaftarPage() {
                                     <ChoiceCard
                                       key={`${q.id}-${k}`}
                                       active={active}
-                                      onClick={() =>
-                                        setValue(`caseAnswers.${unitId}.${q.id}` as any, k, { shouldValidate: true })
-                                      }
+                                      hasError={hasCaseError}
+                                      onClick={() => {
+                                        setValue(`caseAnswers.${unitId}.${q.id}` as any, k, { shouldValidate: true });
+                                        setCaseErrors((prev) => {
+                                          const next = { ...prev };
+                                          next[caseKey] = false;
+                                          return next;
+                                        });
+                                      }}
                                     >
                                       <div className="flex items-start gap-3">
                                         <div
@@ -1355,6 +1501,9 @@ export default function DaftarPage() {
                                     </ChoiceCard>
                                   );
                                 })}
+                                {hasCaseError ? (
+                                  <div className="text-xs text-rose-300">Wajib pilih salah satu jawaban.</div>
+                                ) : null}
                               </div>
                             </div>
                           );
@@ -1381,10 +1530,16 @@ export default function DaftarPage() {
                   </div>
                 </div>
 
-                <Field label="Kalau kamu punya kendala/tanggungan, strategi kamu biar tetap jalan?" helper="jujur & realistis" error={(errors as any)?.essays?.constraints_mitigation?.message}>
+                <Field
+                  label="Kalau kamu punya kendala/tanggungan, strategi kamu biar tetap jalan?"
+                  helper="jujur & realistis"
+                  error={(errors as any)?.essays?.constraints_mitigation?.message}
+                  name="essays.constraints_mitigation"
+                >
                   <TextArea
                     rows={5}
                     placeholder="Contoh: aku bagi waktu, komunikasi dari awal, dan pilih prioritas…"
+                    aria-invalid={Boolean((errors as any)?.essays?.constraints_mitigation)}
                     {...register("essays.constraints_mitigation", {
                       required: "Wajib diisi ya",
                       minLength: { value: 50, message: "Minimal 50 karakter" },
@@ -1393,23 +1548,24 @@ export default function DaftarPage() {
                   />
                 </Field>
 
-                <Field label="Growth yang paling kamu harapkan" error={(errors as any)?.essays?.growth_hope?.message}>
+                <Field label="Growth yang paling kamu harapkan" error={(errors as any)?.essays?.growth_hope?.message} name="essays.growth_hope">
                   <RadioGroup
                     name="essays.growth_hope"
                     options={growthOptions}
                     requiredMsg="Pilih salah satu ya."
                     includeLainnyaIfMissing
+                    hasError={Boolean((errors as any)?.essays?.growth_hope)}
                   />
                 </Field>
 
                 {growthHope === "LAINNYA" && (
-                  <Field label="Detail singkat" helper="Opsional">
+                  <Field label="Detail singkat" helper="Opsional" name="essays.growth_detail">
                     <TextInput placeholder="Tulis 1 kalimat" {...register("essays.growth_detail")} />
                   </Field>
                 )}
 
                 {workValueOptions.length > 0 && (
-                  <Field label="Nilai kerja yang kamu suka di tim" helper="maks 3 pilihan">
+                  <Field label="Nilai kerja yang kamu suka di tim" helper="maks 3 pilihan" name="essays.work_values">
                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {workValueOptions.map((txt) => {
                         const active = (watch("essays.work_values") || []).includes(txt);
@@ -1506,7 +1662,13 @@ export default function DaftarPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div
+                  className={cx(
+                    "rounded-2xl border border-white/10 bg-white/[0.03] p-4",
+                    (errors as any)?.consent_data && "border-rose-400/70 bg-rose-500/10"
+                  )}
+                  data-field="consent_data"
+                >
                   <label className="flex items-start gap-3">
                     <input
                       type="checkbox"
