@@ -166,24 +166,6 @@ export async function POST(req: Request) {
     idemMap.set(idem, now);
   }
 
-  // (CAPTCHA) Dev-friendly: hanya wajib kalau env secret ada
-  const hcaptchaSecret = process.env.HCAPTCHA_SECRET || "";
-  if (hcaptchaSecret) {
-    const token = (payload.captchaToken || "").trim();
-    if (!token) {
-      return NextResponse.json({ ok: false, message: "Captcha dibutuhkan." }, { status: 400 });
-    }
-    const verify = await fetch("https://hcaptcha.com/siteverify", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ secret: hcaptchaSecret, response: token, remoteip: ip }),
-    }).then((r) => r.json()).catch(() => null);
-
-    if (!verify?.success) {
-      return NextResponse.json({ ok: false, message: "Captcha gagal. Coba lagi ya." }, { status: 400 });
-    }
-  }
-
   // Append to sheet
   try {
     const row = buildRow(payload, { ip, ua });
