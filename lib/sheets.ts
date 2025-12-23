@@ -10,7 +10,13 @@ function mustEnv(name: string) {
 function getJwtClient() {
   const email = mustEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
   const keyRaw = mustEnv("GOOGLE_PRIVATE_KEY");
-  const key = keyRaw.replace(/\\n/g, "\n");
+  const keyWithNewlines = keyRaw.replace(/\\n/g, "\n");
+  const key =
+    keyWithNewlines.includes("-----BEGIN")
+      ? keyWithNewlines
+      : /^[A-Za-z0-9+/=\n\r]+$/.test(keyWithNewlines)
+        ? Buffer.from(keyWithNewlines, "base64").toString("utf-8")
+        : keyWithNewlines;
 
   return new JWT({
     email,

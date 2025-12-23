@@ -72,7 +72,8 @@ type FormValues = {
 // =====================
 const DRAFT_KEY = "oprec_himatika_2026_draft_v7";
 const TAGLINE = "Syncronized Growth, Reaching New heights";
-const LOGO_SRC = "public/himatikaLogo.Png"; // taruh file ini di /public dengan nama yang SAMA PERSIS (case-sensitive di Vercel)
+const LOGO_SRC = "/HimatikaLogo.png";
+const CASES_PER_PACK = 5;
 
 type StepDef =
   | {
@@ -581,7 +582,7 @@ export default function DaftarPage() {
       setBannerMsg("Studi kasus belum termuat. Tunggu sebentar ya…");
       return false;
     }
-    const list = (casesBank[unitId] || []).slice(0, 6);
+    const list = (casesBank[unitId] || []).slice(0, CASES_PER_PACK);
     const ids = list.map((q) => q.id);
     const count = getCaseAnsweredCount(unitId, ids);
 
@@ -589,8 +590,8 @@ export default function DaftarPage() {
       setBannerMsg("Studi kasus untuk pilihan ini belum ditemukan. (Cek key CASES vs UNITS.id)");
       return false;
     }
-    if (count < 6) {
-      setBannerMsg("Slide ini wajib terjawab 6/6 dulu ya 🙂");
+    if (count < CASES_PER_PACK) {
+      setBannerMsg(`Slide ini wajib terjawab ${CASES_PER_PACK}/${CASES_PER_PACK} dulu ya 🙂`);
       return false;
     }
     return true;
@@ -607,7 +608,7 @@ export default function DaftarPage() {
       ensureCaseOrderOnce();
     }
 
-    // case step: enforce 6/6
+    // case step: enforce 5/5
     if (currentStep.kind === "case") {
       const ok = validateCasePack(currentStep.unitId);
       if (!ok) return;
@@ -725,10 +726,10 @@ export default function DaftarPage() {
 
       const selected = (caseOrder && caseOrder.length === 3 ? caseOrder : getValues("dept.pick_3")) || [];
       for (const unitId of selected) {
-        const list = (bank[unitId] || []).slice(0, 6);
+        const list = (bank[unitId] || []).slice(0, CASES_PER_PACK);
         const ids = list.map((q) => q.id);
         const answered = getCaseAnsweredCount(unitId, ids);
-        if (list.length === 0 || answered < 6) {
+        if (list.length === 0 || answered < CASES_PER_PACK) {
           setBannerMsg("Masih ada studi kasus yang belum lengkap. Cek lagi ya 🙂");
           // jump to first problematic pack
           const packIdx = selected.findIndex((u) => u === unitId);
@@ -885,7 +886,9 @@ export default function DaftarPage() {
                   {currentStep?.title ?? "—"}
                 </div>
                 <div className="mt-1 text-xs text-white/50">
-                  {currentStep?.kind === "base" ? currentStep.comfortHint : "Jawab cepat, 6 pertanyaan saja di slide ini."}
+                  {currentStep?.kind === "base"
+                    ? currentStep.comfortHint
+                    : `Jawab cepat, ${CASES_PER_PACK} pertanyaan saja di slide ini.`}
                 </div>
               </div>
               <div className="text-xs text-white/55">
@@ -1064,7 +1067,7 @@ export default function DaftarPage() {
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                   <div className="text-sm font-semibold text-white/90">Pilih tepat 3</div>
                   <div className="mt-1 text-xs text-white/55">
-                    Setelah ini kamu akan dapat 3 paket studi kasus (masing-masing 6 soal). Tidak ada judul bidang agar jawaban tidak bias.
+                    Setelah ini kamu akan dapat 3 paket studi kasus (masing-masing {CASES_PER_PACK} soal). Tidak ada judul bidang agar jawaban tidak bias.
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {(watch("dept.pick_3") || []).map((id) => (
@@ -1156,7 +1159,7 @@ export default function DaftarPage() {
                       Paket {currentStep.packIndex}/{currentStep.packTotal}
                     </div>
                     <div className="mt-1 text-xs text-white/55">
-                      SE MA NGATT!! • Wajib jawab 6/6 • Pilih yang paling menggambarkan langkah kamu
+                      SE MA NGATT!! • Wajib jawab {CASES_PER_PACK}/{CASES_PER_PACK} • Pilih yang paling menggambarkan langkah kamu
                     </div>
                   </div>
                   <div className="relative h-9 w-9 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
@@ -1196,7 +1199,7 @@ export default function DaftarPage() {
                 ) : (
                   (() => {
                     const unitId = currentStep.unitId;
-                    const list = (casesBank[unitId] || []).slice(0, 6);
+                    const list = (casesBank[unitId] || []).slice(0, CASES_PER_PACK);
 
                     if (list.length === 0) {
                       return (
@@ -1219,10 +1222,12 @@ export default function DaftarPage() {
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                           <div className="flex items-center justify-between gap-3">
                             <div className="text-xs text-white/55">Progress paket</div>
-                            <div className="text-xs text-white/75">{answered}/6 terjawab</div>
+                            <div className="text-xs text-white/75">
+                              {answered}/{CASES_PER_PACK} terjawab
+                            </div>
                           </div>
                           <div className="mt-3">
-                            <ProgressBar value={(answered / 6) * 100} />
+                            <ProgressBar value={(answered / CASES_PER_PACK) * 100} />
                           </div>
                         </div>
 
@@ -1233,7 +1238,9 @@ export default function DaftarPage() {
                             <div key={q.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className="text-xs text-white/55">Soal {idx + 1}/6</div>
+                                <div className="text-xs text-white/55">
+                                  Soal {idx + 1}/{CASES_PER_PACK}
+                                </div>
                                   <div className="mt-0.5 text-sm font-semibold text-white/90">{q.title}</div>
                                 </div>
                                 <div className="text-[11px] text-white/45">{selected ? `Jawaban: ${selected}` : "Belum dijawab"}</div>
@@ -1411,13 +1418,15 @@ export default function DaftarPage() {
                   <div className="mt-2 space-y-1 text-sm text-white/80">
                     {caseUnits.length === 3 ? (
                       caseUnits.map((u, idx) => {
-                        const list = casesBank ? (casesBank[u] || []).slice(0, 6) : [];
+                        const list = casesBank ? (casesBank[u] || []).slice(0, CASES_PER_PACK) : [];
                         const ids = list.map((q) => q.id);
                         const answered = ids.length ? getCaseAnsweredCount(u, ids) : 0;
                         return (
                           <div key={`${u}-${idx}`} className="flex items-center justify-between gap-3">
                             <span className="text-white/75">Paket {idx + 1}</span>
-                            <span className="text-white/55">{casesBank ? `${answered}/6 terjawab` : "—"}</span>
+                            <span className="text-white/55">
+                              {casesBank ? `${answered}/${CASES_PER_PACK} terjawab` : "—"}
+                            </span>
                           </div>
                         );
                       })
