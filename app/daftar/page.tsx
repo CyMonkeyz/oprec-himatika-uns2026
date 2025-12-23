@@ -189,6 +189,7 @@ function GlassCard({ children, className }: { children: React.ReactNode; classNa
     <div
       className={cx(
         "rounded-3xl border border-white/10 bg-white/[0.05] shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur",
+        "motion-safe:animate-[fadeSlide_0.45s_ease] transition-transform duration-300 sm:hover:-translate-y-0.5",
         className
       )}
     >
@@ -203,12 +204,14 @@ function SoftButton({
   disabled,
   variant = "primary",
   type = "button",
+  className,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   variant?: "primary" | "ghost";
   type?: "button" | "submit";
+  className?: string;
 }) {
   return (
     <button
@@ -221,7 +224,8 @@ function SoftButton({
           "border border-white/15 bg-white/10 text-white hover:bg-white/15 active:bg-white/20",
         variant === "ghost" &&
           "border border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.06] active:bg-white/[0.09]",
-        disabled && "opacity-60 cursor-not-allowed active:scale-100"
+        disabled && "opacity-60 cursor-not-allowed active:scale-100",
+        className
       )}
     >
       {children}
@@ -260,8 +264,8 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cx(
-        "w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none",
-        "placeholder:text-white/35 focus:border-white/25 focus:ring-2 focus:ring-white/10",
+        "w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3.5 text-base text-white outline-none sm:py-3 sm:text-sm",
+        "placeholder:text-white/35 focus:border-white/25 focus:ring-2 focus:ring-white/10 transition-colors",
         invalid && "border-rose-400/70 focus:border-rose-300 focus:ring-rose-400/20",
         props.className
       )}
@@ -275,8 +279,8 @@ function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
     <textarea
       {...props}
       className={cx(
-        "w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none",
-        "placeholder:text-white/35 focus:border-white/25 focus:ring-2 focus:ring-white/10",
+        "w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3.5 text-base text-white outline-none sm:py-3 sm:text-sm",
+        "placeholder:text-white/35 focus:border-white/25 focus:ring-2 focus:ring-white/10 transition-colors",
         invalid && "border-rose-400/70 focus:border-rose-300 focus:ring-rose-400/20",
         props.className
       )}
@@ -303,7 +307,7 @@ function ChoiceCard({
       disabled={disabled}
       onClick={onClick}
       className={cx(
-        "w-full rounded-2xl border px-4 py-3 text-left transition",
+        "w-full rounded-2xl border px-4 py-3.5 text-left transition sm:py-3 motion-safe:transition-transform duration-200 active:scale-[0.99]",
         active
           ? "border-white/25 bg-white/10"
           : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]",
@@ -959,7 +963,7 @@ export default function DaftarPage() {
   // Render
   // =====================
   return (
-    <main className="min-h-screen bg-[radial-gradient(1200px_600px_at_20%_0%,rgba(255,255,255,0.10),transparent_60%),radial-gradient(900px_500px_at_90%_20%,rgba(255,255,255,0.08),transparent_55%),linear-gradient(to_bottom,rgba(0,0,0,0.92),rgba(0,0,0,0.98))] px-4 py-10 text-white">
+    <main className="min-h-screen bg-[radial-gradient(1200px_600px_at_20%_0%,rgba(255,255,255,0.10),transparent_60%),radial-gradient(900px_500px_at_90%_20%,rgba(255,255,255,0.08),transparent_55%),linear-gradient(to_bottom,rgba(0,0,0,0.92),rgba(0,0,0,0.98))] px-3 py-8 text-white sm:px-4 sm:py-10">
       <form
         onSubmit={(e) => e.preventDefault()}
         onKeyDown={(e) => {
@@ -969,20 +973,20 @@ export default function DaftarPage() {
           e.preventDefault();
         }}
       >
-        <div className="mx-auto w-full max-w-2xl space-y-6">
+        <div className="mx-auto w-full max-w-2xl space-y-5 pb-24 sm:space-y-6 sm:pb-8">
           {/* Header */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="relative h-11 w-11 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
                 <Image src={LOGO_SRC} alt="HIMATIKA" fill className="object-contain p-2" priority />
               </div>
               <div>
                 <div className="text-xs text-white/55">Open Recruitment</div>
-                <div className="text-xl font-semibold tracking-tight">HIMATIKA FMIPA UNS 2026</div>
+                <div className="text-lg font-semibold tracking-tight sm:text-xl">HIMATIKA FMIPA UNS 2026</div>
                 <div className="mt-0.5 text-xs text-white/50">{TAGLINE}</div>
               </div>
             </div>
-            <div className="text-right">
+            <div className="w-full text-left sm:w-auto sm:text-right">
               {headerRight}
               <div className="mt-1 text-[11px] text-white/40">{progressPct}%</div>
             </div>
@@ -1712,15 +1716,21 @@ export default function DaftarPage() {
           {/* Sticky nav */}
           <div className="sticky bottom-4">
             <div className="rounded-3xl border border-white/10 bg-black/60 p-3 backdrop-blur shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
-              <div className="flex items-center justify-between gap-3">
-                <SoftButton variant="ghost" onClick={goBack} disabled={current === 0 || submitting}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <SoftButton
+                  variant="ghost"
+                  onClick={goBack}
+                  disabled={current === 0 || submitting}
+                  className="w-full sm:w-auto"
+                >
                   Kembali
                 </SoftButton>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <SoftButton
                     variant="ghost"
                     disabled={submitting}
+                    className="w-full sm:w-auto"
                     onClick={() => {
                       saveDraft(getValues());
                       setSaveStatus("saved");
@@ -1733,13 +1743,14 @@ export default function DaftarPage() {
                   </SoftButton>
 
                   {current < steps.length - 1 ? (
-                    <SoftButton onClick={goNext} disabled={submitting}>
+                    <SoftButton onClick={goNext} disabled={submitting} className="w-full sm:w-auto">
                       Lanjut
                     </SoftButton>
                   ) : (
                     <SoftButton
                       onClick={finalSubmit}
                       disabled={submitting}
+                      className="w-full sm:w-auto"
                     >
                       {submitting ? (
                         <span className="inline-flex items-center gap-2">
