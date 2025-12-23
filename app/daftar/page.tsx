@@ -35,12 +35,6 @@ type FormValues = {
     contact: string;
   };
 
-  plan: {
-    next_year: string;
-    next_year_detail?: string;
-    hours_weekly?: string;
-  };
-
   transport: {
     mode: string;
     offline_flex: string; // "1".."5"
@@ -57,10 +51,6 @@ type FormValues = {
     consistency_detail?: string;
   };
 
-  role: {
-    deadline_style: string;
-  };
-
   dept: {
     pick_3: UnitId[];
   };
@@ -68,7 +58,6 @@ type FormValues = {
   caseAnswers: Record<string, Record<string, CaseKey>>;
 
   essays: {
-    join_reason: string; // penting
     constraints_mitigation: string; // penting
     growth_hope: string; // pilihan ganda (boleh ada "LAINNYA")
     growth_detail?: string;
@@ -88,7 +77,7 @@ const LOGO_SRC = "public/himatikaLogo.Png"; // taruh file ini di /public dengan 
 type StepDef =
   | {
       kind: "base";
-      key: "bio" | "plan" | "transport" | "work" | "pick" | "essay" | "review";
+      key: "bio" | "transport" | "work" | "pick" | "essay" | "review";
       title: string;
       fields: Array<Path<FormValues>>;
       comfortHint?: string;
@@ -367,7 +356,6 @@ export default function DaftarPage() {
         current_residence: "",
         contact: "",
       },
-      plan: { next_year: "", next_year_detail: "", hours_weekly: "" },
       transport: { mode: "", offline_flex: "" },
       commitment: {
         scenario: "",
@@ -377,11 +365,9 @@ export default function DaftarPage() {
         consistency: "",
         consistency_detail: "",
       },
-      role: { deadline_style: "" },
       dept: { pick_3: [] },
       caseAnswers: {},
       essays: {
-        join_reason: "",
         constraints_mitigation: "",
         growth_hope: "",
         growth_detail: "",
@@ -432,7 +418,6 @@ export default function DaftarPage() {
   }, [watch]);
 
   const pick3Live = watch("dept.pick_3");
-  const planNext = watch("plan.next_year");
   const commitScenario = watch("commitment.scenario");
   const commitComms = watch("commitment.comms");
   const commitConsistency = watch("commitment.consistency");
@@ -465,13 +450,6 @@ export default function DaftarPage() {
       },
       {
         kind: "base",
-        key: "plan",
-        title: "Rencana 1 Tahun",
-        fields: ["plan.next_year"],
-        comfortHint: "Bantu panitia bagi beban kerja yang manusiawi.",
-      },
-      {
-        kind: "base",
         key: "transport",
         title: "Transportasi",
         fields: ["transport.mode", "transport.offline_flex"],
@@ -481,7 +459,7 @@ export default function DaftarPage() {
         kind: "base",
         key: "work",
         title: "Gaya Kerja",
-        fields: ["commitment.scenario", "commitment.comms", "commitment.consistency", "role.deadline_style"],
+        fields: ["commitment.scenario", "commitment.comms", "commitment.consistency"],
         comfortHint: "Tidak ada jawaban paling benar—yang jujur paling membantu.",
       },
       {
@@ -507,7 +485,7 @@ export default function DaftarPage() {
         kind: "base",
         key: "essay",
         title: "Pertanyaan Inti",
-        fields: ["essays.join_reason", "essays.constraints_mitigation", "essays.growth_hope"],
+        fields: ["essays.constraints_mitigation", "essays.growth_hope"],
         comfortHint: "Terakhir—habis ini tinggal review & kirim.",
       },
       {
@@ -799,14 +777,12 @@ export default function DaftarPage() {
   // =====================
   const O: any = OPTIONS as any;
 
-  const planOptions: OptionItem[] = (O.plan_next_year ?? O.plan1y ?? []) as OptionItem[];
   const transportOptions: OptionItem[] = (O.transport_mode ?? O.transport ?? []) as OptionItem[];
   const offlineFlexOptions: string[] = (O.transport_offline_flex ?? ["1", "2", "3", "4", "5"]) as string[];
 
   const scenarioOptions: OptionItem[] = (O.commit_scenario ?? []) as OptionItem[];
   const commsOptions: OptionItem[] = (O.commit_comms ?? []) as OptionItem[];
   const consistencyOptions: OptionItem[] = (O.consistency_pattern ?? []) as OptionItem[];
-  const roleOptions: OptionItem[] = (O.role_deadline ?? []) as OptionItem[];
 
   const growthOptions: OptionItem[] = (O.growth_hope ?? []) as OptionItem[];
   const workValueOptions: string[] = (O.work_values ?? []) as string[];
@@ -820,7 +796,6 @@ export default function DaftarPage() {
   const breakCard = useMemo(() => {
     // kecil aja biar user nggak capek
     if (currentStep?.kind !== "base") return null;
-    if (currentStep.key === "plan") return <TinyBreak title="Tarik napas dulu" desc="Form ini tidak ada timer. Jawab santai, yang penting jujur." />;
     if (currentStep.key === "work") return <TinyBreak title="Kamu sudah jauh" desc={`Sedikit lagi. ${TAGLINE}`} />;
     if (currentStep.key === "essay") return <TinyBreak title="Almost there" desc="Tulis singkat dan spesifik. 4–6 kalimat cukup." />;
     return null;
@@ -992,30 +967,6 @@ export default function DaftarPage() {
               </div>
             )}
 
-            {/* ========== STEP: PLAN ========== */}
-            {currentStep?.kind === "base" && currentStep.key === "plan" && (
-              <div className="space-y-4">
-                <Field label="Rencana utama 1 tahun ke depan" error={(errors as any)?.plan?.next_year?.message}>
-                  <RadioGroup
-                    name="plan.next_year"
-                    options={planOptions}
-                    requiredMsg="Pilih salah satu ya."
-                    includeLainnyaIfMissing
-                  />
-                </Field>
-
-                {planNext === "LAINNYA" && (
-                  <Field label="Detail singkat" helper="Opsional">
-                    <TextInput placeholder="Tulis 1 kalimat aja" {...register("plan.next_year_detail")} />
-                  </Field>
-                )}
-
-                <Field label="Estimasi jam luang per minggu" helper="Opsional">
-                  <TextInput placeholder="Contoh: 6–8 jam/minggu" {...register("plan.hours_weekly")} />
-                </Field>
-              </div>
-            )}
-
             {/* ========== STEP: TRANSPORT ========== */}
             {currentStep?.kind === "base" && currentStep.key === "transport" && (
               <div className="space-y-4">
@@ -1100,14 +1051,6 @@ export default function DaftarPage() {
                     <TextInput placeholder="Tulis 1 kalimat" {...register("commitment.consistency_detail")} />
                   </Field>
                 )}
-
-                <Field label="Saat deadline mepet, kamu paling nyaman ambil peran…" error={(errors as any)?.role?.deadline_style?.message}>
-                  <RadioGroup
-                    name="role.deadline_style"
-                    options={roleOptions}
-                    requiredMsg="Pilih salah satu ya."
-                  />
-                </Field>
 
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white/55">
                   Mini note: ini bukan tes “ideal”. Kami hanya ingin tim yang nyaman dan sinkron. <span className="text-white/70">{TAGLINE}</span>
@@ -1360,18 +1303,6 @@ export default function DaftarPage() {
                     </div>
                   </div>
                 </div>
-
-                <Field label="Alasan ikut HIMATIKA 2026" helper="4–6 kalimat, spesifik" error={(errors as any)?.essays?.join_reason?.message}>
-                  <TextArea
-                    rows={5}
-                    placeholder="Ceritakan konteks dan alasan yang nyata (singkat saja)."
-                    {...register("essays.join_reason", {
-                      required: "Wajib diisi ya",
-                      minLength: { value: 50, message: "Minimal 50 karakter" },
-                      maxLength: { value: 800, message: "Maks 800 karakter" },
-                    })}
-                  />
-                </Field>
 
                 <Field label="Kalau kamu punya kendala/tanggungan, strategi kamu biar tetap jalan?" helper="jujur & realistis" error={(errors as any)?.essays?.constraints_mitigation?.message}>
                   <TextArea

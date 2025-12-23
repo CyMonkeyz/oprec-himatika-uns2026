@@ -83,10 +83,6 @@ function buildRow(payload: SubmitPayload, meta: { ip: string; ua: string }) {
     payload.bio.current_residence,
     payload.bio.contact,
 
-    payload.plan.next_year,
-    payload.plan.next_year_detail || "",
-    payload.plan.hours_weekly || "",
-
     payload.transport.mode,
     payload.transport.offline_flex,
 
@@ -97,15 +93,12 @@ function buildRow(payload: SubmitPayload, meta: { ip: string; ua: string }) {
     payload.commitment.consistency,
     payload.commitment.consistency_detail || "",
 
-    payload.role.deadline_style,
-
     p1,
     p2,
     p3,
 
     safeJson(casesCompact),
 
-    payload.essays.join_reason,
     payload.essays.constraints_mitigation,
     payload.essays.growth_hope,
     payload.essays.growth_detail || "",
