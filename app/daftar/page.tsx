@@ -2,12 +2,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Path } from "react-hook-form";
 
 import { UNITS, type UnitId } from "@/content/units";
 import { OPTIONS, type OptionItem } from "@/content/options";
+import { compressImage } from "@/lib/compress-image";
 
 // =====================
 // Types
@@ -21,6 +22,14 @@ type CaseQuestion = {
   options: Record<"A" | "B" | "C" | "D", string>;
 };
 type CasesBank = Record<string, CaseQuestion[]>;
+
+type UploadState = {
+  status: "idle" | "compressing" | "uploading" | "success" | "error";
+  message?: string;
+  previewUrl?: string;
+  fileName?: string;
+  size?: number;
+};
 
 type FormValues = {
   hp?: string;
@@ -64,20 +73,35 @@ type FormValues = {
     work_values: string[]; // max 3
   };
 
+  twibbon: {
+    proof_file_id: string;
+    proof_view_link?: string;
+    proof_file_name?: string;
+  };
+
+  ttd: {
+    file_id: string;
+    view_link?: string;
+    file_name?: string;
+  };
+
   consent_data: boolean;
 };
 
 // =====================
 // Constants
 // =====================
-const DRAFT_KEY = "oprec_himatika_2026_draft_v7";
+const DRAFT_KEY = "oprec_himatika_2026_draft_v8";
 const TAGLINE = "Syncronized Growth, Reaching New heights";
 const LOGO_SRC = "/HimatikaLogo.png";
+const SPRITE_SRC = "/stop-motion-sprite.svg";
+const TWIBBON_PUBLIC_LINK = "https://drive.google.com/drive/folders/1-vNrwgoTx4KaFnI_UslaKuPUG4-QXyz-?usp=sharing";
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 const CASES_PER_PACK = 5;
 type StepDef =
   | {
       kind: "base";
-      key: "bio" | "transport" | "work" | "pick" | "essay" | "review";
+      key: "bio" | "transport" | "work" | "pick" | "essay" | "twibbon" | "ttd" | "review";
       title: string;
       fields: Array<Path<FormValues>>;
       comfortHint?: string;
@@ -96,6 +120,14 @@ type StepDef =
 // =====================
 function cx(...cls: Array<string | false | null | undefined>) {
   return cls.filter(Boolean).join(" ");
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes || Number.isNaN(bytes)) return "0 B";
+  const units = ["B", "KB", "MB"];
+  const idx = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const val = bytes / 1024 ** idx;
+  return `${val.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
 }
 
 function safeLoadDraft(): Partial<FormValues> | null {
@@ -334,6 +366,14 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
+function StepSprite() {
+  return (
+    <div className="pointer-events-none absolute right-4 top-4 opacity-70" aria-hidden="true">
+      <div className="stop-motion-sprite" />
+    </div>
+  );
+}
+
 // =====================
 // Page
 // =====================
@@ -349,11 +389,15 @@ export default function DaftarPage() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [bannerMsg, setBannerMsg] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [twibbonState, setTwibbonState] = useState<UploadState>({ status: "idle" });
+  const [ttdState, setTtdState] = useState<UploadState>({ status: "idle" });
 
   const submitLock = useRef(false);
   const saveTimer = useRef<number | null>(null);
   const saveStatusTimer = useRef<number | null>(null);
   const pendingScrollField = useRef<string | null>(null);
+  const twibbonInputRef = useRef<HTMLInputElement>(null);
+  const ttdInputRef = useRef<HTMLInputElement>(null);
 
   const draftStartedAt = useRef<number>(Date.now());
   const idempotencyKey = useRef<string>(genKey());
@@ -387,6 +431,16 @@ export default function DaftarPage() {
         growth_hope: "",
         growth_detail: "",
         work_values: [],
+      },
+      twibbon: {
+        proof_file_id: "",
+        proof_view_link: "",
+        proof_file_name: "",
+      },
+      ttd: {
+        file_id: "",
+        view_link: "",
+        file_name: "",
       },
       consent_data: false,
     },
@@ -432,12 +486,28 @@ export default function DaftarPage() {
     };
   }, [watch]);
 
+  useEffect(() => {
+    const url = twibbonState.previewUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [twibbonState.previewUrl]);
+
+  useEffect(() => {
+    const url = ttdState.previewUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [ttdState.previewUrl]);
+
   const pick3Live = watch("dept.pick_3");
   const commitScenario = watch("commitment.scenario");
   const commitComms = watch("commitment.comms");
   const commitConsistency = watch("commitment.consistency");
   const growthHope = watch("essays.growth_hope");
   const workValues = watch("essays.work_values");
+  const twibbonMeta = watch("twibbon");
+  const ttdMeta = watch("ttd");
 
   // enforce max 3 work values
   useEffect(() => {
@@ -501,7 +571,21 @@ export default function DaftarPage() {
         key: "essay",
         title: "Pertanyaan Inti",
         fields: ["essays.constraints_mitigation", "essays.growth_hope"],
-        comfortHint: "Terakhir—habis ini tinggal review & kirim.",
+        comfortHint: "Habis ini tinggal upload Twibbon & tanda tangan.",
+      },
+      {
+        kind: "base",
+        key: "twibbon",
+        title: "Twibbon 📸",
+        fields: ["twibbon.proof_file_id"],
+        comfortHint: "Upload bukti Twibbon dulu ya, setelah ini tanda tangan.",
+      },
+      {
+        kind: "base",
+        key: "ttd",
+        title: "Tanda Tangan ✍️",
+        fields: ["ttd.file_id"],
+        comfortHint: "Upload tanda tangan yang jelas & rapi.",
       },
       {
         kind: "base",
@@ -760,6 +844,138 @@ export default function DaftarPage() {
     );
   }
 
+  const setUploadState = useCallback(
+    (kind: "twibbon" | "ttd", next: UploadState) => {
+      if (kind === "twibbon") setTwibbonState(next);
+      else setTtdState(next);
+    },
+    []
+  );
+
+  const resetUpload = useCallback(
+    (kind: "twibbon" | "ttd") => {
+      setUploadState(kind, { status: "idle" });
+      if (kind === "twibbon") {
+        setValue("twibbon.proof_file_id", "", { shouldValidate: true });
+        setValue("twibbon.proof_view_link", "");
+        setValue("twibbon.proof_file_name", "");
+      } else {
+        setValue("ttd.file_id", "", { shouldValidate: true });
+        setValue("ttd.view_link", "");
+        setValue("ttd.file_name", "");
+      }
+    },
+    [setUploadState, setValue]
+  );
+
+  const handleUpload = useCallback(
+    async (kind: "twibbon" | "ttd", file: File) => {
+      const setState = (next: UploadState) => setUploadState(kind, next);
+      const endpoint = kind === "twibbon" ? "/api/upload-twibbon" : "/api/upload-ttd";
+      const maxDim = kind === "twibbon" ? 1920 : 1600;
+      const label = kind === "twibbon" ? "Twibbon" : "TTD";
+
+      if (!file) return;
+
+      if (!["image/jpeg", "image/png"].includes(file.type)) {
+        setState({ status: "error", message: "Format harus JPG atau PNG ya." });
+        return;
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setState({ status: "error", message: "Ukuran file > 4MB. Coba crop atau pilih file lain ya." });
+        return;
+      }
+
+      const fullName = (getValues("bio.full_name") || "").trim();
+      if (!fullName) {
+        setState({ status: "error", message: "Isi nama lengkap dulu ya sebelum upload." });
+        setError("bio.full_name", { type: "manual", message: "Nama lengkap wajib diisi dulu." });
+        requestScrollToField("bio.full_name");
+        return;
+      }
+
+      if (kind === "twibbon") {
+        setValue("twibbon.proof_file_id", "", { shouldValidate: true });
+        setValue("twibbon.proof_view_link", "");
+        setValue("twibbon.proof_file_name", "");
+      } else {
+        setValue("ttd.file_id", "", { shouldValidate: true });
+        setValue("ttd.view_link", "");
+        setValue("ttd.file_name", "");
+      }
+
+      setState({ status: "compressing", message: "Mengompres..." });
+
+      try {
+        const outputMime = file.type === "image/png" ? "image/png" : "image/jpeg";
+        const compressed = await compressImage(file, {
+          maxDim,
+          outputMime,
+          quality: outputMime === "image/jpeg" ? 0.82 : undefined,
+        });
+
+        if (compressed.size > MAX_UPLOAD_BYTES) {
+          setState({
+            status: "error",
+            message: "Setelah kompresi masih > 4MB. Coba crop/ulang foto ya.",
+          });
+          return;
+        }
+
+        const previewUrl = URL.createObjectURL(compressed);
+        setState({
+          status: "uploading",
+          message: "Mengupload...",
+          previewUrl,
+          fileName: compressed.name,
+          size: compressed.size,
+        });
+
+        const body = new FormData();
+        body.append("file", compressed);
+        body.append("full_name", fullName);
+        const nim = (getValues("bio.nim") || "").trim();
+        if (nim) body.append("nim", nim);
+        body.append("idempotencyKey", `${idempotencyKey.current}-${kind}`);
+
+        const res = await fetch(endpoint, { method: "POST", body });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+          setState({
+            status: "error",
+            message: json?.message || `Upload ${label} gagal. Coba lagi ya.`,
+            previewUrl,
+          });
+          return;
+        }
+
+        if (kind === "twibbon") {
+          setValue("twibbon.proof_file_id", json.fileId || "", { shouldValidate: true });
+          setValue("twibbon.proof_view_link", json.webViewLink || "");
+          setValue("twibbon.proof_file_name", json.name || "");
+          clearErrors("twibbon.proof_file_id");
+        } else {
+          setValue("ttd.file_id", json.fileId || "", { shouldValidate: true });
+          setValue("ttd.view_link", json.webViewLink || "");
+          setValue("ttd.file_name", json.name || "");
+          clearErrors("ttd.file_id");
+        }
+
+        setState({
+          status: "success",
+          message: `${label} berhasil diupload ✅`,
+          previewUrl,
+          fileName: json.name || compressed.name,
+          size: Number(json.size || compressed.size),
+        });
+      } catch (e: any) {
+        setState({ status: "error", message: e?.message || `Upload ${label} gagal.` });
+      }
+    },
+    [clearErrors, getValues, requestScrollToField, setError, setUploadState, setValue]
+  );
+
   async function finalSubmit() {
     if (submitLock.current) return;
     submitLock.current = true;
@@ -769,10 +985,18 @@ export default function DaftarPage() {
 
     try {
       // quick validations
-      const okConsent = await trigger(["consent_data"] as any, { shouldFocus: true });
+      const okConsent = await trigger(["consent_data", "twibbon.proof_file_id", "ttd.file_id"] as any, { shouldFocus: true });
       if (!okConsent) {
-        setCurrent(steps.findIndex((s) => s.kind === "base" && s.key === "review"));
-        requestScrollToField("consent_data");
+        if (!getValues("twibbon.proof_file_id")) {
+          setCurrent(steps.findIndex((s) => s.kind === "base" && s.key === "twibbon"));
+          requestScrollToField("twibbon.proof_file_id");
+        } else if (!getValues("ttd.file_id")) {
+          setCurrent(steps.findIndex((s) => s.kind === "base" && s.key === "ttd"));
+          requestScrollToField("ttd.file_id");
+        } else {
+          setCurrent(steps.findIndex((s) => s.kind === "base" && s.key === "review"));
+          requestScrollToField("consent_data");
+        }
         return;
       }
 
@@ -963,7 +1187,8 @@ export default function DaftarPage() {
           ) : null}
 
           {/* Progress */}
-          <GlassCard className="p-5">
+          <GlassCard className="p-5 relative overflow-hidden">
+            <StepSprite />
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-xs text-white/55">Progress</div>
@@ -991,6 +1216,14 @@ export default function DaftarPage() {
           <GlassCard className="p-5">
             {/* honeypot */}
             <input type="text" className="hidden" tabIndex={-1} autoComplete="off" {...register("hp")} />
+            <input
+              type="hidden"
+              {...register("twibbon.proof_file_id", { required: "Upload Twibbon dulu ya." })}
+            />
+            <input
+              type="hidden"
+              {...register("ttd.file_id", { required: "Upload tanda tangan dulu ya." })}
+            />
 
             {/* ========== STEP: BIODATA ========== */}
             {currentStep?.kind === "base" && currentStep.key === "bio" && (
@@ -1543,6 +1776,206 @@ export default function DaftarPage() {
               </div>
             )}
 
+            {/* ========== STEP: TWIBBON ========== */}
+            {currentStep?.kind === "base" && currentStep.key === "twibbon" && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-lg font-semibold text-white/90">Twibbon 📸</div>
+                  <div className="mt-2 text-sm text-white/70 leading-relaxed">
+                    <strong>Last step dulu yaa ✨</strong> Upload <em>screenshot Instagram</em> bukti kamu udah pakai
+                    &amp; upload Twibbon 😆📸 Pastikan kelihatan <strong>username</strong> +{" "}
+                    <strong>Twibbon</strong>. Cukup <strong>1 gambar</strong> aja ya 💛
+                  </div>
+                  <div className="mt-3">
+                    <SoftButton onClick={() => window.open(TWIBBON_PUBLIC_LINK, "_blank", "noopener,noreferrer")}>
+                      Ambil Twibbon & Ketentuan ➜
+                    </SoftButton>
+                  </div>
+                </div>
+
+                <Field
+                  label="Upload bukti Twibbon"
+                  helper="Format: JPG/PNG • Maks 4MB (nanti dikompres otomatis) ✅"
+                  error={(errors as any)?.twibbon?.proof_file_id?.message}
+                  name="twibbon.proof_file_id"
+                >
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+                    <input
+                      ref={twibbonInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.currentTarget.value = "";
+                        if (!file) return;
+                        handleUpload("twibbon", file);
+                      }}
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SoftButton
+                        onClick={() => twibbonInputRef.current?.click()}
+                        disabled={twibbonState.status === "compressing" || twibbonState.status === "uploading"}
+                      >
+                        {twibbonMeta?.proof_file_id ? "Ganti file" : "Pilih file"}
+                      </SoftButton>
+                      {twibbonMeta?.proof_file_id ? (
+                        <SoftButton
+                          variant="ghost"
+                          onClick={() => resetUpload("twibbon")}
+                          disabled={twibbonState.status === "compressing" || twibbonState.status === "uploading"}
+                        >
+                          Hapus
+                        </SoftButton>
+                      ) : null}
+                      {twibbonMeta?.proof_view_link ? (
+                        <a
+                          href={twibbonMeta.proof_view_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-white/60 hover:text-white/80"
+                        >
+                          Lihat di Drive
+                        </a>
+                      ) : null}
+                    </div>
+
+                    {twibbonState.previewUrl ? (
+                      <div className="overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                        <img src={twibbonState.previewUrl} alt="Preview Twibbon" className="h-40 w-full object-cover" />
+                      </div>
+                    ) : null}
+
+                    <div className="text-xs text-white/55">
+                      {twibbonState.status === "compressing" && (
+                        <span className="inline-flex items-center gap-2">
+                          Mengompres <LoadingDots />
+                        </span>
+                      )}
+                      {twibbonState.status === "uploading" && (
+                        <span className="inline-flex items-center gap-2">
+                          Mengupload <LoadingDots />
+                        </span>
+                      )}
+                      {twibbonState.status === "success" && (
+                        <span className="inline-flex items-center gap-2 text-emerald-300">
+                          ✅ {twibbonState.fileName || twibbonMeta?.proof_file_name || "Berhasil"}
+                          {twibbonState.size ? ` • ${formatBytes(twibbonState.size)}` : ""}
+                        </span>
+                      )}
+                      {twibbonState.status === "error" && (
+                        <span className="text-rose-300">{twibbonState.message}</span>
+                      )}
+                      {twibbonState.status === "idle" && twibbonMeta?.proof_file_id ? (
+                        <span className="text-emerald-300">
+                          ✅ {twibbonMeta.proof_file_name || "Sudah terupload"}
+                        </span>
+                      ) : null}
+                      {twibbonState.status === "idle" && !twibbonMeta?.proof_file_id ? (
+                        <span>Pilih 1 gambar bukti Twibbon kamu ya.</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </Field>
+              </div>
+            )}
+
+            {/* ========== STEP: TTD ========== */}
+            {currentStep?.kind === "base" && currentStep.key === "ttd" && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-lg font-semibold text-white/90">Tanda Tangan ✍️</div>
+                  <div className="mt-2 text-sm text-white/70 leading-relaxed">
+                    <strong>Upload tanda tangan kamu ya ✨</strong> Bisa foto/scan jelas di kertas putih.{" "}
+                    <em>Jangan blur yaa</em> 😄
+                  </div>
+                </div>
+
+                <Field
+                  label="Upload tanda tangan"
+                  helper="Format: PNG/JPG • Maks 4MB (nanti dikompres otomatis) ✅"
+                  error={(errors as any)?.ttd?.file_id?.message}
+                  name="ttd.file_id"
+                >
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+                    <input
+                      ref={ttdInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.currentTarget.value = "";
+                        if (!file) return;
+                        handleUpload("ttd", file);
+                      }}
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SoftButton
+                        onClick={() => ttdInputRef.current?.click()}
+                        disabled={ttdState.status === "compressing" || ttdState.status === "uploading"}
+                      >
+                        {ttdMeta?.file_id ? "Ganti file" : "Pilih file"}
+                      </SoftButton>
+                      {ttdMeta?.file_id ? (
+                        <SoftButton
+                          variant="ghost"
+                          onClick={() => resetUpload("ttd")}
+                          disabled={ttdState.status === "compressing" || ttdState.status === "uploading"}
+                        >
+                          Hapus
+                        </SoftButton>
+                      ) : null}
+                      {ttdMeta?.view_link ? (
+                        <a
+                          href={ttdMeta.view_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-white/60 hover:text-white/80"
+                        >
+                          Lihat di Drive
+                        </a>
+                      ) : null}
+                    </div>
+
+                    {ttdState.previewUrl ? (
+                      <div className="overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                        <img src={ttdState.previewUrl} alt="Preview Tanda Tangan" className="h-40 w-full object-cover" />
+                      </div>
+                    ) : null}
+
+                    <div className="text-xs text-white/55">
+                      {ttdState.status === "compressing" && (
+                        <span className="inline-flex items-center gap-2">
+                          Mengompres <LoadingDots />
+                        </span>
+                      )}
+                      {ttdState.status === "uploading" && (
+                        <span className="inline-flex items-center gap-2">
+                          Mengupload <LoadingDots />
+                        </span>
+                      )}
+                      {ttdState.status === "success" && (
+                        <span className="inline-flex items-center gap-2 text-emerald-300">
+                          ✅ {ttdState.fileName || ttdMeta?.file_name || "Berhasil"}
+                          {ttdState.size ? ` • ${formatBytes(ttdState.size)}` : ""}
+                        </span>
+                      )}
+                      {ttdState.status === "error" && <span className="text-rose-300">{ttdState.message}</span>}
+                      {ttdState.status === "idle" && ttdMeta?.file_id ? (
+                        <span className="text-emerald-300">✅ {ttdMeta.file_name || "Sudah terupload"}</span>
+                      ) : null}
+                      {ttdState.status === "idle" && !ttdMeta?.file_id ? (
+                        <span>Pilih 1 gambar tanda tangan kamu ya.</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </Field>
+              </div>
+            )}
+
             {/* ========== STEP: REVIEW ========== */}
             {currentStep?.kind === "base" && currentStep.key === "review" && (
               <div className="space-y-4">
@@ -1591,6 +2024,24 @@ export default function DaftarPage() {
                     ) : (
                       <div className="text-white/55">—</div>
                     )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-xs text-white/55">Upload wajib</div>
+                  <div className="mt-2 space-y-1 text-sm text-white/80">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-white/75">Twibbon</span>
+                      <span className={twibbonMeta?.proof_file_id ? "text-emerald-300" : "text-rose-300"}>
+                        {twibbonMeta?.proof_file_id ? "✅ Terupload" : "Belum upload"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-white/75">Tanda tangan</span>
+                      <span className={ttdMeta?.file_id ? "text-emerald-300" : "text-rose-300"}>
+                        {ttdMeta?.file_id ? "✅ Terupload" : "Belum upload"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1690,6 +2141,29 @@ export default function DaftarPage() {
           </div>
         </div>
       </form>
+
+      <style jsx>{`
+        .stop-motion-sprite {
+          width: 32px;
+          height: 32px;
+          background-image: url(${SPRITE_SRC});
+          background-size: 128px 32px;
+          background-repeat: no-repeat;
+          animation: sprite-shift 0.9s steps(4) infinite;
+        }
+
+        @keyframes sprite-shift {
+          to {
+            background-position: -128px 0;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .stop-motion-sprite {
+            animation: none;
+          }
+        }
+      `}</style>
     </main>
   );
 }

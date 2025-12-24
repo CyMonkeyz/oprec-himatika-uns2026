@@ -104,6 +104,13 @@ function buildRow(payload: SubmitPayload, meta: { ip: string; ua: string }) {
     payload.essays.growth_detail || "",
     workValues,
 
+    payload.twibbon.proof_file_id,
+    payload.twibbon.proof_view_link || "",
+    payload.twibbon.proof_file_name || "",
+    payload.ttd.file_id,
+    payload.ttd.view_link || "",
+    payload.ttd.file_name || "",
+
     payload.idempotencyKey || "",
     meta.ip,
     meta.ua,

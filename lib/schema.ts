@@ -51,6 +51,18 @@ export const SubmitSchema = z.object({
     work_values: z.array(z.string().trim().min(1)).max(3, "Maks 3").default([]),
   }),
 
+  twibbon: z.object({
+    proof_file_id: z.string().trim().min(1, "Wajib upload Twibbon"),
+    proof_view_link: z.string().trim().max(400).optional().or(z.literal("")),
+    proof_file_name: z.string().trim().max(200).optional().or(z.literal("")),
+  }),
+
+  ttd: z.object({
+    file_id: z.string().trim().min(1, "Wajib upload tanda tangan"),
+    view_link: z.string().trim().max(400).optional().or(z.literal("")),
+    file_name: z.string().trim().max(200).optional().or(z.literal("")),
+  }),
+
   consent_data: z.boolean().refine((v) => v === true, "Wajib setuju"),
 
   // meta anti-spam
