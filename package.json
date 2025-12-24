@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
-    "@upstash/ratelimit": "^2.0.7",
-    "@upstash/redis": "^1.35.8",
     "googleapis": "^169.0.0",
     "next": "16.0.10",
     "react": "19.2.1",
